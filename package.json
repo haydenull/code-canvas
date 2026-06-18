@@ -1,0 +1,33 @@
+{
+  "name": "code-canvas",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "code-canvas": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target node --packages external && tsc --noEmit",
+    "check": "tsc --noEmit",
+    "view": "bun src/cli.ts view artifacts/example.logic.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "@xyflow/react": "latest",
+    "commander": "^15.0.0",
+    "dagre": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/dagre": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "esbuild": "^0.28.1",
+    "typescript": "latest"
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "title": "CLI 启动 view 的流程",
+  "entry": {
+    "name": "code-canvas view",
+    "file": "src/cli.ts",
+    "startLine": 61,
+    "endLine": 68
+  },
+  "artifact": {
+    "id": "cli-view-flow",
+    "createdAt": "2026-06-18T16:45:00+08:00"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "kind": "entry",
+      "label": "注册 view 命令",
+      "summary": "Commander 定义 `code-canvas view <artifactPath>`，注册 host 和 port 参数，并把命令绑定到 `view` 处理函数。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 61,
+        "endLine": 66
+      },
+      "code": "program\n  .name(\"code-canvas\")\n  .command(\"view <artifactPath>\")\n  .option(\"--host <host>\", \"host\", \"127.0.0.1\")\n  .option(\"--port <port>\", \"port\", parsePort, 0)\n  .action(view);"
+    },
+    {
+      "id": "n2",
+      "kind": "call",
+      "label": "解析 CLI 参数",
+      "summary": "`parseAsync` 读取用户输入的命令，执行选项解析器，然后带着 artifact 路径和解析后的参数调用 `view`。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 68,
+        "endLine": 71
+      },
+      "code": "program.parseAsync().catch((error) => {\n  console.error(error instanceof Error ? error.message : error);\n  process.exit(1);\n});"
+    },
+    {
+      "id": "n3",
+      "kind": "statement",
+      "label": "解析 artifact 路径",
+      "summary": "`view` 处理函数在访问文件前，先把用户传入的 artifact 路径转换成绝对路径。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 42,
+        "endLine": 44
+      },
+      "code": "async function view(artifactPath: string, { host, port }: ViewOptions) {\n  artifactPath = resolve(artifactPath);\n  loadArtifact(artifactPath);"
+    },
+    {
+      "id": "n4",
+      "kind": "call",
+      "label": "校验 artifact",
+      "summary": "`loadArtifact` 检查 JSON 文件是否存在，读取并解析文件内容，然后按 logic artifact schema 校验数据。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 15,
+        "endLine": 20
+      },
+      "code": "function loadArtifact(path: string): void {\n  if (!existsSync(path)) {\n    throw new Error(`Artifact not found: ${path}`);\n  }\n  validateLogicArtifact(JSON.parse(readFileSync(path, \"utf8\")));\n}"
+    },
+    {
+      "id": "n5",
+      "kind": "call",
+      "label": "创建 Vite 服务",
+      "summary": "CLI 把 Vite 根目录指向 `src/viewer`，禁用外部配置，应用用户指定的 host 和 port，并安装 React 插件与 artifact 中间件。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 46,
+        "endLine": 52
+      },
+      "code": "const viewerRoot = resolve(fileURLToPath(new URL(\"../src/viewer\", import.meta.url)));\nconst server = await createServer({\n  root: viewerRoot,\n  configFile: false,\n  server: { host, port, strictPort: port !== 0 },\n  plugins: [react(), artifactPlugin(artifactPath)],\n});"
+    },
+    {
+      "id": "n6",
+      "kind": "call",
+      "label": "提供 artifact JSON",
+      "summary": "自定义 Vite 中间件把当前选中的 artifact 暴露为 `/artifact.json`，让 viewer 加载 CLI 传入的同一个文件。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 30,
+        "endLine": 40
+      },
+      "code": "function artifactPlugin(artifactPath: string): Plugin {\n  return {\n    name: \"code-canvas-artifact\",\n    configureServer(server) {\n      server.middlewares.use(\"/artifact.json\", (_request, response) => {\n        response.setHeader(\"content-type\", \"application/json; charset=utf-8\");\n        response.end(readFileSync(artifactPath, \"utf8\"));\n      });\n    },\n  };\n}"
+    },
+    {
+      "id": "n7",
+      "kind": "call",
+      "label": "监听并打印地址",
+      "summary": "服务创建完成后，CLI 开始监听端口，打印 Vite 访问地址，并输出当前正在服务的 artifact 文件。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 54,
+        "endLine": 56
+      },
+      "code": "await server.listen();\nserver.printUrls();\nconsole.log(`Serving artifact: ${artifactPath}`);"
+    },
+    {
+      "id": "n8",
+      "kind": "call",
+      "label": "viewer 拉取 artifact",
+      "summary": "React viewer 加载后请求 `/artifact.json`，校验响应数据，并把 artifact 保存到组件状态中。",
+      "codeRef": {
+        "file": "src/viewer/main.tsx",
+        "startLine": 82,
+        "endLine": 87
+      },
+      "code": "useEffect(() => {\n  fetch(\"/artifact.json\")\n    .then(async (response) => validateLogicArtifact(await response.json()))\n    .then(setArtifact)\n    .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));\n}, []);"
+    },
+    {
+      "id": "n9",
+      "kind": "return",
+      "label": "渲染流程视图",
+      "summary": "校验后的 artifact 数据会转换为 React Flow 的节点和连线，并和右侧详情面板一起渲染，方便查看对应源码。",
+      "codeRef": {
+        "file": "src/viewer/main.tsx",
+        "startLine": 89,
+        "endLine": 115
+      },
+      "code": "const elements = useMemo(() => (artifact ? toReactFlowElements(artifact) : null), [artifact]);\n\nreturn (\n  <main className=\"app\">\n    <section className=\"canvas\" aria-label=\"Code logic flow\">\n      <ReactFlow\n        nodes={elements.nodes}\n        edges={elements.edges}\n        nodeTypes={nodeTypes}\n        fitView\n        onNodeClick={(_event, node) => setSelectedNode(node)}\n        onPaneClick={() => setSelectedNode(null)}\n      >\n        <Background />\n        <Controls />\n        <MiniMap pannable zoomable />\n      </ReactFlow>\n    </section>\n    <DetailPanel node={selectedNode} artifact={artifact} />\n  </main>\n);"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n2",
+      "kind": "next",
+      "label": "命令已注册"
+    },
+    {
+      "id": "e2",
+      "source": "n2",
+      "target": "n3",
+      "kind": "call",
+      "label": "触发处理函数"
+    },
+    {
+      "id": "e3",
+      "source": "n3",
+      "target": "n4",
+      "kind": "call",
+      "label": "读取文件"
+    },
+    {
+      "id": "e4",
+      "source": "n4",
+      "target": "n5",
+      "kind": "next",
+      "label": "artifact 有效"
+    },
+    {
+      "id": "e5",
+      "source": "n5",
+      "target": "n6",
+      "kind": "call",
+      "label": "安装中间件"
+    },
+    {
+      "id": "e6",
+      "source": "n6",
+      "target": "n7",
+      "kind": "next",
+      "label": "中间件就绪"
+    },
+    {
+      "id": "e7",
+      "source": "n7",
+      "target": "n8",
+      "kind": "next",
+      "label": "浏览器打开 viewer"
+    },
+    {
+      "id": "e8",
+      "source": "n8",
+      "target": "n6",
+      "kind": "call",
+      "label": "GET /artifact.json"
+    },
+    {
+      "id": "e9",
+      "source": "n6",
+      "target": "n8",
+      "kind": "return",
+      "label": "返回 artifact JSON"
+    },
+    {
+      "id": "e10",
+      "source": "n8",
+      "target": "n9",
+      "kind": "return",
+      "label": "artifact 已加载"
+    }
+  ],
+  "notes": [
+    "可通过 `bun src/cli.ts view artifacts/example.logic.json` 或 `bun run view` 启动。",
+    "这个 artifact 包含 CLI 入口、Vite 中间件和 React viewer 加载路径的源码片段。"
+  ]
+}

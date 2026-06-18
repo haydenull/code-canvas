@@ -1,0 +1,125 @@
+import { z } from "zod";
+
+export const nodeKinds = ["entry", "statement", "branch", "loop", "call", "return", "throw"] as const;
+export const edgeKinds = ["next", "true", "false", "loop", "call", "return", "error"] as const;
+
+const codeRefSchema = z.object(
+  {
+    file: z.string().min(1),
+    startLine: z.number(),
+    endLine: z.number(),
+  },
+  { error: "must be an object" },
+);
+
+const entrySchema = z.object(
+  {
+    name: z.string().min(1),
+    file: z.string().min(1),
+    startLine: z.number(),
+    endLine: z.number(),
+  },
+  { error: "must be an object" },
+);
+
+const artifactMetaSchema = z.object(
+  {
+    id: z.string().min(1),
+    createdAt: z.string().min(1),
+  },
+  { error: "must be an object" },
+);
+
+const nodeSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(nodeKinds, { error: "is invalid" }),
+  label: z.string().min(1),
+  summary: z.string().min(1),
+  codeRef: codeRefSchema.optional(),
+  code: z.string({ error: "must be a string" }).optional(),
+});
+
+const edgeSchema = z.object({
+  id: z.string().min(1),
+  source: z.string().min(1),
+  target: z.string().min(1),
+  kind: z.enum(edgeKinds, { error: "is invalid" }),
+  label: z.string({ error: "must be a string" }).optional(),
+});
+
+const logicArtifactSchema = z
+  .object(
+    {
+      schemaVersion: z.literal(1, { error: "must be 1" }),
+      title: z.string().min(1),
+      entry: entrySchema,
+      artifact: artifactMetaSchema,
+      nodes: z.array(nodeSchema, { error: "must be an array" }),
+      edges: z.array(edgeSchema, { error: "must be an array" }),
+      notes: z.array(z.string({ error: "must be a string" }), { error: "must be an array of strings" }),
+    },
+    { error: "Artifact must be a JSON object" },
+  )
+  .superRefine((artifact, ctx) => {
+    const nodeIds = new Set<string>();
+
+    for (const [index, node] of artifact.nodes.entries()) {
+      if (nodeIds.has(node.id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["nodes", index, "id"],
+          message: `nodes[${index}].id must be unique`,
+        });
+      }
+      nodeIds.add(node.id);
+    }
+
+    for (const [index, edge] of artifact.edges.entries()) {
+      if (!nodeIds.has(edge.source)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["edges", index, "source"],
+          message: `edges[${index}].source must reference an existing node`,
+        });
+      }
+      if (!nodeIds.has(edge.target)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["edges", index, "target"],
+          message: `edges[${index}].target must reference an existing node`,
+        });
+      }
+    }
+  });
+
+export type LogicNodeKind = (typeof nodeKinds)[number];
+export type LogicEdgeKind = (typeof edgeKinds)[number];
+export type CodeRef = z.infer<typeof codeRefSchema>;
+export type LogicNode = z.infer<typeof nodeSchema>;
+export type LogicEdge = z.infer<typeof edgeSchema>;
+export type LogicArtifact = z.infer<typeof logicArtifactSchema>;
+
+function formatPath(path: PropertyKey[]): string {
+  return path.reduce<string>((formatted, part) => {
+    if (typeof part === "number") {
+      return `${formatted}[${part}]`;
+    }
+    const key = String(part);
+    return formatted ? `${formatted}.${key}` : key;
+  }, "");
+}
+
+export function validateLogicArtifact(value: unknown): LogicArtifact {
+  const result = logicArtifactSchema.safeParse(value);
+
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    if (!issue) {
+      throw new Error("Artifact is invalid");
+    }
+    const path = formatPath(issue.path);
+    throw new Error(path ? `${path} ${issue.message}` : issue.message);
+  }
+
+  return result.data;
+}

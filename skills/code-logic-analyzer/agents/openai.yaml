@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Logic Analyzer"
+  short_description: "Analyze code logic into Code Canvas JSON artifacts."
+  default_prompt: "Analyze this TypeScript or React code path and create a Code Canvas logic artifact."
