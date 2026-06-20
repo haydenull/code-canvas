@@ -1,85 +1,134 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
-import { Background, Controls, Handle, MiniMap, Position, ReactFlow, type NodeProps } from "@xyflow/react";
+import {
+  Background,
+  Controls,
+  Handle,
+  MiniMap,
+  Panel,
+  PanOnScrollMode,
+  Position,
+  ReactFlow,
+  type NodeProps,
+} from "@xyflow/react";
+import { codeToHtml, type BundledLanguage } from "shiki";
 import "@xyflow/react/dist/style.css";
-import { toReactFlowElements, type LogicFlowNode, type LogicNodeData } from "../shared/flow";
+import { toReactFlowElements, type LogicFlowElementNode, type LogicFlowNode } from "../shared/flow";
 import { validateLogicArtifact, type LogicArtifact } from "../shared/schema";
 import "./styles.css";
 
-function LogicNode({ data, selected }: NodeProps<LogicFlowNode>) {
+function moduleThemeStyle(theme: LogicFlowNode["data"]["moduleTheme"]): CSSProperties | undefined {
+  if (!theme) {
+    return undefined;
+  }
+  return {
+    "--module-accent": theme.accent,
+    "--module-border": theme.border,
+    "--module-background": theme.background,
+  } as CSSProperties;
+}
+
+const languageByExtension: Record<string, BundledLanguage> = {
+  c: "c",
+  cpp: "cpp",
+  css: "css",
+  go: "go",
+  html: "html",
+  java: "java",
+  js: "javascript",
+  json: "json",
+  jsx: "jsx",
+  md: "markdown",
+  py: "python",
+  rs: "rust",
+  sh: "shellscript",
+  ts: "typescript",
+  tsx: "tsx",
+  yaml: "yaml",
+  yml: "yaml",
+};
+
+function getCodeLanguage(file?: string): BundledLanguage {
+  const extension = file?.split(".").pop()?.toLowerCase();
+  return extension ? (languageByExtension[extension] ?? "log") : "log";
+}
+
+function SourceCode({ code, file }: { code: string; file?: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setHtml(null);
+
+    codeToHtml(code, {
+      lang: getCodeLanguage(file),
+      theme: "github-light",
+    }).then((nextHtml) => {
+      if (!cancelled) {
+        setHtml(nextHtml);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, file]);
+
+  if (!html) {
+    return <pre className="logic-node__code nodrag nowheel">{code}</pre>;
+  }
+
+  return <div className="logic-node__code nodrag nowheel" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function LogicNode({ data }: NodeProps<LogicFlowNode>) {
   return (
-    <div className={`logic-node ${selected ? "is-selected" : ""}`}>
+    <div className="logic-node" style={moduleThemeStyle(data.moduleTheme)}>
       <Handle type="target" position={Position.Left} />
       <div className="logic-node__kind">{data.kind}</div>
       <div className="logic-node__label">{data.label}</div>
       <div className="logic-node__summary">{data.summary}</div>
+      {data.codeRef || data.code ? (
+        <div className="logic-node__detail">
+          {data.codeRef ? (
+            <p className="logic-node__ref">
+              {data.codeRef.file}:{data.codeRef.startLine}-{data.codeRef.endLine}
+            </p>
+          ) : null}
+          {data.code ? <SourceCode code={data.code} file={data.codeRef?.file} /> : null}
+        </div>
+      ) : null}
       <Handle type="source" position={Position.Right} />
     </div>
   );
 }
 
-const nodeTypes = { logic: LogicNode };
-
-function DetailPanel({ node, artifact }: { node: LogicFlowNode | null; artifact: LogicArtifact }) {
-  const data: LogicNodeData | undefined = node?.data;
-
+function ModuleGroupNode({ data }: NodeProps<Extract<LogicFlowElementNode, { type: "moduleGroup" }>>) {
   return (
-    <aside className="details">
-      <div>
-        <p className="details__eyebrow">Code Canvas</p>
-        <h1>{artifact.title}</h1>
-      </div>
-      <dl>
-        <div>
-          <dt>Entry</dt>
-          <dd>{artifact.entry.name}</dd>
-        </div>
-        <div>
-          <dt>Source</dt>
-          <dd>
-            {artifact.entry.file}:{artifact.entry.startLine}-{artifact.entry.endLine}
-          </dd>
-        </div>
-        <div>
-          <dt>Artifact</dt>
-          <dd>{artifact.artifact.id}</dd>
-        </div>
-      </dl>
+    <div className="module-group" style={moduleThemeStyle(data.moduleTheme)}>
+      <div className="module-group__label">{data.file}</div>
+      <div className="module-group__count">{data.nodeCount} nodes</div>
+    </div>
+  );
+}
 
-      {data ? (
-        <section className="node-detail">
-          <p className="details__eyebrow">Selected Node</p>
-          <h2>{data.label}</h2>
-          <p>{data.summary}</p>
-          {data.codeRef ? (
-            <p className="code-ref">
-              {data.codeRef.file}:{data.codeRef.startLine}-{data.codeRef.endLine}
-            </p>
-          ) : null}
-          {data.code ? <pre>{data.code}</pre> : null}
-        </section>
-      ) : (
-        <p className="empty-state">Select a node to inspect its logic details.</p>
-      )}
+const nodeTypes = { logic: LogicNode, moduleGroup: ModuleGroupNode };
 
-      {artifact.notes.length > 0 ? (
-        <section className="notes">
-          <p className="details__eyebrow">Notes</p>
-          <ul>
-            {artifact.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </aside>
+function ArtifactPanel({ artifact }: { artifact: LogicArtifact }) {
+  return (
+    <Panel position="top-left" className="artifact-panel">
+      <p className="artifact-panel__eyebrow">Code Canvas</p>
+      <h1>{artifact.title}</h1>
+      <p>
+        {artifact.entry.name} · {artifact.entry.file}:{artifact.entry.startLine}-{artifact.entry.endLine}
+      </p>
+    </Panel>
   );
 }
 
 function App() {
   const [artifact, setArtifact] = useState<LogicArtifact | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<LogicFlowNode | null>(null);
 
   useEffect(() => {
     fetch("/artifact.json")
@@ -105,15 +154,16 @@ function App() {
           edges={elements.edges}
           nodeTypes={nodeTypes}
           fitView
-          onNodeClick={(_event, node) => setSelectedNode(node)}
-          onPaneClick={() => setSelectedNode(null)}
+          panOnScroll
+          panOnScrollMode={PanOnScrollMode.Free}
+          zoomOnScroll={false}
         >
+          <ArtifactPanel artifact={artifact} />
           <Background />
           <Controls />
           <MiniMap pannable zoomable />
         </ReactFlow>
       </section>
-      <DetailPanel node={selectedNode} artifact={artifact} />
     </main>
   );
 }

@@ -7,51 +7,184 @@ export interface LogicNodeData extends Record<string, unknown> {
   label: string;
   kind: LogicNode["kind"];
   summary: string;
-  codeRef?: LogicNode["codeRef"];
+  codeRef?: {
+    file: string;
+    startLine: number;
+    endLine: number;
+  };
   code?: string;
+  moduleTheme?: ModuleTheme;
 }
 
-export type LogicFlowNode = Node<LogicNodeData>;
+export interface ModuleGroupNodeData extends Record<string, unknown> {
+  file: string;
+  nodeCount: number;
+  moduleTheme: ModuleTheme;
+}
+
+export type LogicFlowNode = Node<LogicNodeData> & { type: "logic"; data: LogicNodeData };
+export type ModuleGroupFlowNode = Node<ModuleGroupNodeData> & { type: "moduleGroup"; data: ModuleGroupNodeData };
+export type LogicFlowElementNode = LogicFlowNode | ModuleGroupFlowNode;
 export type LogicFlowEdge = Edge<{ kind: LogicEdge["kind"] }>;
 
-const nodeWidth = 240;
+const nodeWidth = 320;
 const nodeHeight = 96;
+const groupPaddingX = 36;
+const groupPaddingTop = 56;
+const groupPaddingBottom = 28;
+
+interface ModuleTheme {
+  accent: string;
+  border: string;
+  background: string;
+}
+
+const moduleThemes: ModuleTheme[] = [
+  { accent: "#c8aa00", border: "#c8aa00", background: "#fff9db" },
+  { accent: "#4aa06b", border: "#4aa06b", background: "#eef8f1" },
+  { accent: "#5172d9", border: "#5172d9", background: "#eef3ff" },
+  { accent: "#ce5b7a", border: "#ce5b7a", background: "#fff0f4" },
+  { accent: "#40a9a6", border: "#40a9a6", background: "#ecfbfa" },
+  { accent: "#8b63cf", border: "#8b63cf", background: "#f4efff" },
+];
+
+function estimateTextHeight(text: string, charactersPerLine: number, lineHeight: number): number {
+  return Math.ceil(text.length / charactersPerLine) * lineHeight;
+}
+
+function estimateCodeHeight(code?: string): number {
+  if (!code) {
+    return 0;
+  }
+  const lineCount = code.split("\n").length;
+  return Math.min(360, lineCount * 14.5 + 22);
+}
+
+function estimateNodeHeight(node: LogicNode): number {
+  const labelHeight = estimateTextHeight(node.label, 24, 18);
+  const summaryHeight = estimateTextHeight(node.summary, 34, 16.2);
+  const detailHeight = node.codeRef || node.code ? 25 + (node.codeRef ? 22 : 0) + estimateCodeHeight(node.code) : 0;
+  return Math.ceil(72 + 13 + 6 + labelHeight + 8 + summaryHeight + detailHeight);
+}
+
+function getModuleGroupId(file: string): string {
+  return `module:${encodeURIComponent(file)}`;
+}
+
+function createModuleThemeMap(files: string[], entryFile: string): Map<string, ModuleTheme> {
+  const sortedFiles = [...files].sort((left, right) => {
+    if (left === entryFile) {
+      return -1;
+    }
+    if (right === entryFile) {
+      return 1;
+    }
+    return left.localeCompare(right);
+  });
+
+  return new Map(
+    sortedFiles.map((file, index) => [file, moduleThemes[index % moduleThemes.length]]),
+  );
+}
+
+function createModuleGroupNodes(nodes: LogicFlowNode[], moduleThemeByFile: Map<string, ModuleTheme>): ModuleGroupFlowNode[] {
+  const nodesByFile = new Map<string, LogicFlowNode[]>();
+
+  for (const node of nodes) {
+    const file = node.data.codeRef?.file;
+    if (!file) {
+      continue;
+    }
+    nodesByFile.set(file, [...(nodesByFile.get(file) ?? []), node]);
+  }
+
+  return Array.from(nodesByFile, ([file, moduleNodes]) => {
+    const minX = Math.min(...moduleNodes.map((node) => node.position.x));
+    const minY = Math.min(...moduleNodes.map((node) => node.position.y));
+    const maxX = Math.max(...moduleNodes.map((node) => node.position.x + nodeWidth));
+    const maxY = Math.max(...moduleNodes.map((node) => node.position.y + Number(node.height ?? nodeHeight)));
+    const width = maxX - minX + groupPaddingX * 2;
+    const height = maxY - minY + groupPaddingTop + groupPaddingBottom;
+
+    return {
+      id: getModuleGroupId(file),
+      type: "moduleGroup",
+      position: {
+        x: minX - groupPaddingX,
+        y: minY - groupPaddingTop,
+      },
+      width,
+      height,
+      zIndex: 0,
+      style: { width, height },
+      selectable: false,
+      draggable: false,
+      data: {
+        file,
+        nodeCount: moduleNodes.length,
+        moduleTheme: moduleThemeByFile.get(file) ?? moduleThemes[0],
+      },
+    };
+  });
+}
 
 export function toReactFlowElements(artifact: LogicArtifact): {
-  nodes: LogicFlowNode[];
+  nodes: LogicFlowElementNode[];
   edges: LogicFlowEdge[];
 } {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({ rankdir: "LR", nodesep: 48, ranksep: 96 });
+  const nodeHeights = new Map(artifact.nodes.map((node) => [node.id, estimateNodeHeight(node)]));
+  const moduleThemeByFile = createModuleThemeMap(
+    Array.from(new Set(artifact.nodes.map((node) => node.codeRef?.file).filter((file) => file !== undefined))),
+    artifact.entry.file,
+  );
 
   for (const node of artifact.nodes) {
-    graph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    graph.setNode(node.id, { width: nodeWidth, height: nodeHeights.get(node.id) ?? nodeHeight });
   }
   for (const edge of artifact.edges) {
     graph.setEdge(edge.source, edge.target);
   }
   dagre.layout(graph);
 
+  const laneTopByCenter = new Map<number, number>();
+  for (const node of artifact.nodes) {
+    const position = graph.node(node.id) ?? { x: 0, y: 0 };
+    const height = nodeHeights.get(node.id) ?? nodeHeight;
+    laneTopByCenter.set(
+      position.y,
+      Math.min(laneTopByCenter.get(position.y) ?? Number.POSITIVE_INFINITY, position.y - height / 2),
+    );
+  }
+
+  const nodes: LogicFlowNode[] = artifact.nodes.map((node) => {
+    const position = graph.node(node.id) ?? { x: 0, y: 0 };
+    const height = nodeHeights.get(node.id) ?? nodeHeight;
+    return {
+      id: node.id,
+      type: "logic",
+      width: nodeWidth,
+      height,
+      zIndex: 1,
+      position: {
+        x: position.x - nodeWidth / 2,
+        y: laneTopByCenter.get(position.y) ?? position.y - height / 2,
+      },
+      data: {
+        label: node.label,
+        kind: node.kind,
+        summary: node.summary,
+        codeRef: node.codeRef,
+        code: node.code,
+        moduleTheme: node.codeRef ? moduleThemeByFile.get(node.codeRef.file) : undefined,
+      },
+    };
+  });
+
   return {
-    nodes: artifact.nodes.map((node) => {
-      const position = graph.node(node.id) ?? { x: 0, y: 0 };
-      return {
-        id: node.id,
-        type: "logic",
-        position: {
-          x: position.x - nodeWidth / 2,
-          y: position.y - nodeHeight / 2,
-        },
-        data: {
-          label: node.label,
-          kind: node.kind,
-          summary: node.summary,
-          codeRef: node.codeRef,
-          code: node.code,
-        },
-      };
-    }),
+    nodes: [...createModuleGroupNodes(nodes, moduleThemeByFile), ...nodes],
     edges: artifact.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
@@ -59,6 +192,7 @@ export function toReactFlowElements(artifact: LogicArtifact): {
       label: edge.label,
       markerEnd: { type: MarkerType.ArrowClosed },
       animated: edge.kind === "call" || edge.kind === "loop",
+      zIndex: 1,
       data: { kind: edge.kind },
     })),
   };

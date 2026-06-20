@@ -19,6 +19,7 @@
     "dagre": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "shiki": "^4.2.0",
     "vite": "latest",
     "zod": "^4.4.3"
   },
