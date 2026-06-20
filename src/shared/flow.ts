@@ -29,9 +29,6 @@ export type LogicFlowEdge = Edge<{ kind: LogicEdge["kind"] }>;
 
 const nodeWidth = 320;
 const nodeHeight = 96;
-const groupPaddingX = 36;
-const groupPaddingTop = 56;
-const groupPaddingBottom = 28;
 
 interface ModuleTheme {
   accent: string;
@@ -58,6 +55,10 @@ function estimateCodeHeight(code?: string): number {
   }
   const lineCount = code.split("\n").length;
   return Math.min(360, lineCount * 14.5 + 22);
+}
+
+function estimateEdgeLabelWidth(label?: string): number {
+  return label ? label.length * 12 + 16 : 0;
 }
 
 function estimateNodeHeight(node: LogicNode): number {
@@ -87,31 +88,22 @@ function createModuleThemeMap(files: string[], entryFile: string): Map<string, M
   );
 }
 
-function createModuleGroupNodes(nodes: LogicFlowNode[], moduleThemeByFile: Map<string, ModuleTheme>): ModuleGroupFlowNode[] {
-  const nodesByFile = new Map<string, LogicFlowNode[]>();
-
-  for (const node of nodes) {
-    const file = node.data.codeRef?.file;
-    if (!file) {
-      continue;
-    }
-    nodesByFile.set(file, [...(nodesByFile.get(file) ?? []), node]);
-  }
-
-  return Array.from(nodesByFile, ([file, moduleNodes]) => {
-    const minX = Math.min(...moduleNodes.map((node) => node.position.x));
-    const minY = Math.min(...moduleNodes.map((node) => node.position.y));
-    const maxX = Math.max(...moduleNodes.map((node) => node.position.x + nodeWidth));
-    const maxY = Math.max(...moduleNodes.map((node) => node.position.y + Number(node.height ?? nodeHeight)));
-    const width = maxX - minX + groupPaddingX * 2;
-    const height = maxY - minY + groupPaddingTop + groupPaddingBottom;
+function createModuleGroupNodes(
+  graph: dagre.graphlib.Graph,
+  nodes: LogicNode[],
+  moduleThemeByFile: Map<string, ModuleTheme>,
+): ModuleGroupFlowNode[] {
+  return Array.from(moduleThemeByFile, ([file, moduleTheme]) => {
+    const position = graph.node(getModuleGroupId(file));
+    const width = position?.width ?? nodeWidth;
+    const height = position?.height ?? nodeHeight;
 
     return {
       id: getModuleGroupId(file),
       type: "moduleGroup",
       position: {
-        x: minX - groupPaddingX,
-        y: minY - groupPaddingTop,
+        x: (position?.x ?? 0) - width / 2,
+        y: (position?.y ?? 0) - height / 2,
       },
       width,
       height,
@@ -121,8 +113,8 @@ function createModuleGroupNodes(nodes: LogicFlowNode[], moduleThemeByFile: Map<s
       draggable: false,
       data: {
         file,
-        nodeCount: moduleNodes.length,
-        moduleTheme: moduleThemeByFile.get(file) ?? moduleThemes[0],
+        nodeCount: nodes.filter((node) => node.codeRef?.file === file).length,
+        moduleTheme,
       },
     };
   });
@@ -132,20 +124,30 @@ export function toReactFlowElements(artifact: LogicArtifact): {
   nodes: LogicFlowElementNode[];
   edges: LogicFlowEdge[];
 } {
-  const graph = new dagre.graphlib.Graph();
+  const graph = new dagre.graphlib.Graph({ compound: true });
   graph.setDefaultEdgeLabel(() => ({}));
-  graph.setGraph({ rankdir: "LR", nodesep: 48, ranksep: 96 });
+  graph.setGraph({ rankdir: "LR", nodesep: 96, ranksep: 96 });
   const nodeHeights = new Map(artifact.nodes.map((node) => [node.id, estimateNodeHeight(node)]));
   const moduleThemeByFile = createModuleThemeMap(
     Array.from(new Set(artifact.nodes.map((node) => node.codeRef?.file).filter((file) => file !== undefined))),
     artifact.entry.file,
   );
 
+  for (const file of moduleThemeByFile.keys()) {
+    graph.setNode(getModuleGroupId(file), {});
+  }
   for (const node of artifact.nodes) {
     graph.setNode(node.id, { width: nodeWidth, height: nodeHeights.get(node.id) ?? nodeHeight });
+    if (node.codeRef) {
+      graph.setParent(node.id, getModuleGroupId(node.codeRef.file));
+    }
   }
   for (const edge of artifact.edges) {
-    graph.setEdge(edge.source, edge.target);
+    graph.setEdge(edge.source, edge.target, edge.label ? {
+      width: estimateEdgeLabelWidth(edge.label),
+      height: 24,
+      labelpos: "c",
+    } : {});
   }
   dagre.layout(graph);
 
@@ -184,7 +186,7 @@ export function toReactFlowElements(artifact: LogicArtifact): {
   });
 
   return {
-    nodes: [...createModuleGroupNodes(nodes, moduleThemeByFile), ...nodes],
+    nodes: [...createModuleGroupNodes(graph, artifact.nodes, moduleThemeByFile), ...nodes],
     edges: artifact.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,

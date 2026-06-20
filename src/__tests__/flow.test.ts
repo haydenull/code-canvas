@@ -88,4 +88,97 @@ describe("toReactFlowElements", () => {
     expect(moduleGroups).toHaveLength(2);
     expect(accents.size).toBe(2);
   });
+
+  test("reserves space between the module title and its nodes", () => {
+    const result = toReactFlowElements(artifact);
+    const moduleGroup = result.nodes.find(isModuleGroupNode);
+    const moduleNode = result.nodes.find((node) => isLogicNode(node) && node.data.codeRef);
+
+    expect(Number(moduleNode?.position.y) - Number(moduleGroup?.position.y)).toBeGreaterThanOrEqual(56);
+  });
+
+  test("reserves space for edge labels between nodes", () => {
+    const result = toReactFlowElements({
+      ...artifact,
+      nodes: [
+        {
+          id: "source",
+          kind: "branch",
+          label: "validate port",
+          summary: "校验端口",
+          codeRef: { file: "src/cli.ts", startLine: 1, endLine: 2 },
+        },
+        {
+          id: "target",
+          kind: "statement",
+          label: "resolve path",
+          summary: "解析路径",
+          codeRef: { file: "src/cli.ts", startLine: 3, endLine: 4 },
+        },
+      ],
+      edges: [
+        {
+          id: "edge",
+          source: "source",
+          target: "target",
+          kind: "true",
+          label: "端口合法，触发处理函数",
+        },
+      ],
+    });
+    const source = result.nodes.find((node) => node.id === "source");
+    const target = result.nodes.find((node) => node.id === "target");
+    const gap = Number(target?.position.x) - Number(source?.position.x) - Number(source?.width);
+
+    expect(gap).toBeGreaterThanOrEqual(148);
+  });
+
+  test("keeps module groups from overlapping", () => {
+    const result = toReactFlowElements({
+      ...artifact,
+      nodes: [
+        {
+          id: "a1",
+          kind: "call",
+          label: "call schema",
+          summary: "进入 schema",
+          codeRef: { file: "src/cli.ts", startLine: 1, endLine: 2 },
+        },
+        {
+          id: "b1",
+          kind: "loop",
+          label: "validate nodes",
+          summary: "校验节点",
+          codeRef: { file: "src/schema.ts", startLine: 1, endLine: 2 },
+        },
+        {
+          id: "b2",
+          kind: "return",
+          label: "return schema",
+          summary: "返回校验结果",
+          codeRef: { file: "src/schema.ts", startLine: 3, endLine: 4 },
+        },
+        {
+          id: "a2",
+          kind: "return",
+          label: "continue cli",
+          summary: "继续 CLI 流程",
+          codeRef: { file: "src/cli.ts", startLine: 3, endLine: 4 },
+        },
+      ],
+      edges: [
+        { id: "ab", source: "a1", target: "b1", kind: "call" },
+        { id: "bb", source: "b1", target: "b2", kind: "next" },
+        { id: "ba", source: "b2", target: "a2", kind: "return" },
+      ],
+    });
+    const [first, second] = result.nodes.filter(isModuleGroupNode);
+    const overlaps =
+      first.position.x < second.position.x + Number(second.width) &&
+      first.position.x + Number(first.width) > second.position.x &&
+      first.position.y < second.position.y + Number(second.height) &&
+      first.position.y + Number(first.height) > second.position.y;
+
+    expect(overlaps).toBe(false);
+  });
 });

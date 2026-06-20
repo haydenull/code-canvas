@@ -43,8 +43,8 @@ select {
   --xy-edge-stroke-default: #5d7cff;
   --xy-edge-stroke-width-default: 2.5;
   --xy-edge-stroke-selected-default: #7b94ff;
-  --xy-node-boxshadow-hover-default: 0 12px 30px rgb(0 0 0 / 24%);
-  --xy-node-boxshadow-selected-default: 0 0 0 3px rgb(93 124 255 / 28%);
+  --xy-node-boxshadow-hover-default: none;
+  --xy-node-boxshadow-selected-default: none;
 }
 
 .react-flow__background {
@@ -118,7 +118,6 @@ h1 {
   border: 1px solid #dfe5df;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 10px 24px rgb(25 38 54 / 13%);
   padding: 12px;
 }
 
@@ -150,9 +149,6 @@ h1 {
   background-size:
     36px 36px,
     100% 100%;
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 58%),
-    0 12px 30px rgb(25 38 54 / 10%);
   padding: 58px 14px 12px;
 }
 
