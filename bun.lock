@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "code-canvas",
+      "name": "@haydenull/code-canvas",
       "dependencies": {
         "@vitejs/plugin-react": "latest",
         "@xyflow/react": "latest",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Canvas Generator"
+  short_description: "Generate Code Canvas artifacts from source code."
+  default_prompt: "Use $code-canvas-generator to analyze this code path and create a self-contained Code Canvas artifact."

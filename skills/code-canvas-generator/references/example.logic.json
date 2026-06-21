@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "title": "提交表单流程",
+  "entry": {
+    "name": "handleSubmit",
+    "file": "src/Form.tsx",
+    "startLine": 20,
+    "endLine": 32
+  },
+  "artifact": {
+    "id": "a1b2c3d4",
+    "createdAt": "2026-06-20T10:30:00+08:00"
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "kind": "entry",
+      "label": "提交表单",
+      "summary": "handleSubmit 接收当前表单数据并开始提交。",
+      "codeRef": {
+        "file": "src/Form.tsx",
+        "startLine": 20,
+        "endLine": 21
+      },
+      "code": "async function handleSubmit(values: FormValues) {"
+    },
+    {
+      "id": "n2",
+      "kind": "branch",
+      "label": "数据是否无效",
+      "summary": "校验失败时提前结束，成功时继续调用保存服务。",
+      "codeRef": {
+        "file": "src/Form.tsx",
+        "startLine": 22,
+        "endLine": 24
+      },
+      "code": "if (!validate(values)) {\n  return;\n}"
+    },
+    {
+      "id": "n3",
+      "kind": "return",
+      "label": "结束提交",
+      "summary": "数据无效时不发送请求。",
+      "codeRef": {
+        "file": "src/Form.tsx",
+        "startLine": 23,
+        "endLine": 23
+      },
+      "code": "return;"
+    },
+    {
+      "id": "n4",
+      "kind": "call",
+      "label": "保存表单",
+      "summary": "调用 saveForm 持久化已通过校验的数据。",
+      "codeRef": {
+        "file": "src/Form.tsx",
+        "startLine": 26,
+        "endLine": 26
+      },
+      "code": "await saveForm(values);"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n2",
+      "kind": "next"
+    },
+    {
+      "id": "e2",
+      "source": "n2",
+      "target": "n3",
+      "kind": "true",
+      "label": "校验失败"
+    },
+    {
+      "id": "e3",
+      "source": "n2",
+      "target": "n4",
+      "kind": "false",
+      "label": "校验通过"
+    }
+  ],
+  "notes": []
+}

@@ -19,6 +19,12 @@ function loadArtifact(path: string): void {
   validateLogicArtifact(JSON.parse(readFileSync(path, "utf8")));
 }
 
+function validate(artifactPath: string): void {
+  artifactPath = resolve(artifactPath);
+  loadArtifact(artifactPath);
+  console.log(`Artifact is valid: ${artifactPath}`);
+}
+
 function parsePort(value: string): number {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
@@ -58,8 +64,13 @@ async function view(artifactPath: string, { host, port }: ViewOptions) {
 
 const program = new Command();
 
+program.name("code-canvas");
+
 program
-  .name("code-canvas")
+  .command("validate <artifactPath>")
+  .action(validate);
+
+program
   .command("view <artifactPath>")
   .option("--host <host>", "host", "127.0.0.1")
   .option("--port <port>", "port", parsePort, 0)
