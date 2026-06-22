@@ -13,6 +13,7 @@ export interface LogicNodeData extends Record<string, unknown> {
     endLine: number;
   };
   code?: string;
+  codeHighlights?: LogicCodeHighlight[];
   moduleTheme?: ModuleTheme;
 }
 
@@ -27,8 +28,19 @@ export type ModuleGroupFlowNode = Node<ModuleGroupNodeData> & { type: "moduleGro
 export type LogicFlowElementNode = LogicFlowNode | ModuleGroupFlowNode;
 export type LogicFlowEdge = Edge<{ kind: LogicEdge["kind"] }>;
 
+export interface LogicCodeHighlight {
+  line: number;
+  text: string;
+  edgeId?: string;
+  node?: "source" | "target";
+  handleId?: string;
+}
+
 const nodeWidth = 320;
 const nodeHeight = 96;
+const maxVisibleCodeLines = 60;
+const codeLineHeight = 14.5;
+const codeVerticalPadding = 20;
 
 interface ModuleTheme {
   accent: string;
@@ -54,7 +66,7 @@ function estimateCodeHeight(code?: string): number {
     return 0;
   }
   const lineCount = code.split("\n").length;
-  return Math.min(360, lineCount * 14.5 + 22);
+  return Math.min(maxVisibleCodeLines, lineCount) * codeLineHeight + codeVerticalPadding;
 }
 
 function estimateEdgeLabelWidth(label?: string): number {
@@ -70,6 +82,10 @@ function estimateNodeHeight(node: LogicNode): number {
 
 function getModuleGroupId(file: string): string {
   return `module:${encodeURIComponent(file)}`;
+}
+
+function getCodeHighlightHandleId(edgeId: string, node: "source" | "target"): string {
+  return `code-highlight:${edgeId}:${node}`;
 }
 
 function createModuleThemeMap(files: string[], entryFile: string): Map<string, ModuleTheme> {
@@ -128,6 +144,7 @@ export function toReactFlowElements(artifact: LogicArtifact): {
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({ rankdir: "LR", nodesep: 96, ranksep: 96 });
   const nodeHeights = new Map(artifact.nodes.map((node) => [node.id, estimateNodeHeight(node)]));
+  const codeHighlightsByNodeId = new Map<string, LogicCodeHighlight[]>();
   const moduleThemeByFile = createModuleThemeMap(
     Array.from(new Set(artifact.nodes.map((node) => node.codeRef?.file).filter((file) => file !== undefined))),
     artifact.entry.file,
@@ -148,6 +165,21 @@ export function toReactFlowElements(artifact: LogicArtifact): {
       height: 24,
       labelpos: "c",
     } : {});
+    const anchoredNodes = new Set<"source" | "target">();
+    for (const highlight of edge.codeHighlights ?? []) {
+      const nodeId = highlight.node === "source" ? edge.source : edge.target;
+      const highlights = codeHighlightsByNodeId.get(nodeId) ?? [];
+      const isAnchor = !anchoredNodes.has(highlight.node);
+      highlights.push({
+        line: highlight.line,
+        text: highlight.text,
+        edgeId: edge.id,
+        node: highlight.node,
+        handleId: isAnchor ? getCodeHighlightHandleId(edge.id, highlight.node) : undefined,
+      });
+      anchoredNodes.add(highlight.node);
+      codeHighlightsByNodeId.set(nodeId, highlights);
+    }
   }
   dagre.layout(graph);
 
@@ -180,6 +212,7 @@ export function toReactFlowElements(artifact: LogicArtifact): {
         summary: node.summary,
         codeRef: node.codeRef,
         code: node.code,
+        codeHighlights: codeHighlightsByNodeId.get(node.id),
         moduleTheme: node.codeRef ? moduleThemeByFile.get(node.codeRef.file) : undefined,
       },
     };
@@ -187,15 +220,26 @@ export function toReactFlowElements(artifact: LogicArtifact): {
 
   return {
     nodes: [...createModuleGroupNodes(graph, artifact.nodes, moduleThemeByFile), ...nodes],
-    edges: artifact.edges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      markerEnd: { type: MarkerType.ArrowClosed },
-      animated: edge.kind === "call" || edge.kind === "loop",
-      zIndex: 1,
-      data: { kind: edge.kind },
-    })),
+    edges: artifact.edges.map((edge) => {
+      const sourceHandle = edge.codeHighlights?.some((highlight) => highlight.node === "source")
+        ? getCodeHighlightHandleId(edge.id, "source")
+        : undefined;
+      const targetHandle = edge.codeHighlights?.some((highlight) => highlight.node === "target")
+        ? getCodeHighlightHandleId(edge.id, "target")
+        : undefined;
+
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle,
+        targetHandle,
+        label: edge.label,
+        markerEnd: { type: MarkerType.ArrowClosed },
+        animated: edge.kind === "call" || edge.kind === "loop",
+        zIndex: 1,
+        data: { kind: edge.kind },
+      };
+    }),
   };
 }

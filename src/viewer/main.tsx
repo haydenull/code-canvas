@@ -9,11 +9,12 @@ import {
   PanOnScrollMode,
   Position,
   ReactFlow,
+  useUpdateNodeInternals,
   type NodeProps,
 } from "@xyflow/react";
-import { codeToHtml, type BundledLanguage } from "shiki";
+import { codeToHtml, type BundledLanguage, type DecorationItem } from "shiki";
 import "@xyflow/react/dist/style.css";
-import { toReactFlowElements, type LogicFlowElementNode, type LogicFlowNode } from "../shared/flow";
+import { toReactFlowElements, type LogicCodeHighlight, type LogicFlowElementNode, type LogicFlowNode } from "../shared/flow";
 import { validateLogicArtifact, type LogicArtifact } from "../shared/schema";
 import "./styles.css";
 
@@ -53,8 +54,68 @@ function getCodeLanguage(file?: string): BundledLanguage {
   return extension ? (languageByExtension[extension] ?? "log") : "log";
 }
 
-function SourceCode({ code, file }: { code: string; file?: string }) {
+const codeAnchorTopPadding = 20;
+const codeLineHeight = 14.5;
+
+function createDecorations(code: string, highlights: LogicCodeHighlight[] = []): DecorationItem[] {
+  const lines = code.split("\n");
+  const seenWords = new Set<string>();
+  const seenLines = new Set<number>();
+
+  return highlights.flatMap((highlight) => {
+    const line = lines[highlight.line - 1];
+    const character = line?.indexOf(highlight.text) ?? -1;
+    if (character < 0) {
+      return [];
+    }
+
+    const key = `${highlight.line}:${character}:${highlight.text.length}`;
+    if (seenWords.has(key)) {
+      return [];
+    }
+    seenWords.add(key);
+
+    const lineIndex = highlight.line - 1;
+    const decorations: DecorationItem[] = [];
+
+    if (!seenLines.has(lineIndex)) {
+      seenLines.add(lineIndex);
+      decorations.push({
+        start: { line: lineIndex, character: 0 },
+        end: { line: lineIndex, character: line.length },
+        properties: { class: "logic-node__code-line-highlight" },
+      });
+    }
+
+    decorations.push({
+      start: { line: lineIndex, character },
+      end: { line: lineIndex, character: character + highlight.text.length },
+      properties: { class: "logic-node__code-highlight" },
+      alwaysWrap: true,
+    });
+
+    return decorations;
+  });
+}
+
+function getHighlightHandleTop(line: number): number {
+  return codeAnchorTopPadding + (line - 1) * codeLineHeight + codeLineHeight / 2;
+}
+
+function SourceCode({
+  code,
+  file,
+  nodeId,
+  codeHighlights,
+}: {
+  code: string;
+  file?: string;
+  nodeId: string;
+  codeHighlights?: LogicCodeHighlight[];
+}) {
   const [html, setHtml] = useState<string | null>(null);
+  const updateNodeInternals = useUpdateNodeInternals();
+  const anchoredHighlights = codeHighlights?.filter((highlight) => highlight.handleId && highlight.node) ?? [];
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +124,7 @@ function SourceCode({ code, file }: { code: string; file?: string }) {
     codeToHtml(code, {
       lang: getCodeLanguage(file),
       theme: "github-light",
+      decorations: createDecorations(code, codeHighlights),
     }).then((nextHtml) => {
       if (!cancelled) {
         setHtml(nextHtml);
@@ -72,16 +134,36 @@ function SourceCode({ code, file }: { code: string; file?: string }) {
     return () => {
       cancelled = true;
     };
-  }, [code, file]);
+  }, [code, file, codeHighlights]);
+
+  useEffect(() => {
+    if (html) {
+      updateNodeInternals(nodeId);
+    }
+  }, [html, nodeId, updateNodeInternals]);
 
   if (!html) {
     return <pre className="logic-node__code nodrag nowheel">{code}</pre>;
   }
 
-  return <div className="logic-node__code nodrag nowheel" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div className="logic-node__code nodrag nowheel">
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+      {anchoredHighlights.map((highlight) => (
+        <Handle
+          className="logic-node__code-handle"
+          id={highlight.handleId}
+          key={highlight.handleId}
+          type={highlight.node === "source" ? "source" : "target"}
+          position={highlight.node === "source" ? Position.Right : Position.Left}
+          style={{ top: getHighlightHandleTop(highlight.line) }}
+        />
+      ))}
+    </div>
+  );
 }
 
-function LogicNode({ data }: NodeProps<LogicFlowNode>) {
+function LogicNode({ id, data }: NodeProps<LogicFlowNode>) {
   return (
     <div className="logic-node" style={moduleThemeStyle(data.moduleTheme)}>
       <Handle type="target" position={Position.Left} />
@@ -95,7 +177,9 @@ function LogicNode({ data }: NodeProps<LogicFlowNode>) {
               {data.codeRef.file}:{data.codeRef.startLine}-{data.codeRef.endLine}
             </p>
           ) : null}
-          {data.code ? <SourceCode code={data.code} file={data.codeRef?.file} /> : null}
+          {data.code ? (
+            <SourceCode code={data.code} file={data.codeRef?.file} nodeId={id} codeHighlights={data.codeHighlights} />
+          ) : null}
         </div>
       ) : null}
       <Handle type="source" position={Position.Right} />

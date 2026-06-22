@@ -220,7 +220,8 @@ h1 {
 }
 
 .logic-node__code {
-  max-height: 360px;
+  position: relative;
+  max-height: 890px;
   margin: 0;
   overflow: auto;
   border: 1px solid #e4e7ec;
@@ -246,6 +247,41 @@ h1 {
 .logic-node__code code {
   display: block;
   min-width: max-content;
+}
+
+.logic-node__code .shiki code {
+  font-size: 0;
+}
+
+.logic-node__code .line {
+  display: block;
+  margin: 0 -10px;
+  padding: 0 10px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.logic-node__code-line-highlight {
+  background: #f2f4f7;
+}
+
+.logic-node__code-highlight {
+  background: #4f7ee8;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px rgb(79 126 232 / 10%);
+}
+
+.logic-node__code-highlight * {
+  color: #ffffff !important;
+}
+
+.logic-node__code-handle {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .react-flow__controls,

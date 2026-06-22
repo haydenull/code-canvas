@@ -133,7 +133,11 @@
       "source": "n2",
       "target": "n3",
       "kind": "call",
-      "label": "进入 loadArtifact"
+      "label": "进入 loadArtifact",
+      "codeHighlights": [
+        { "node": "source", "line": 3, "text": "loadArtifact" },
+        { "node": "target", "line": 1, "text": "loadArtifact" }
+      ]
     },
     {
       "id": "e3",
@@ -154,7 +158,10 @@
       "source": "n5",
       "target": "n6",
       "kind": "call",
-      "label": "进入 schema 校验"
+      "label": "进入 schema 校验",
+      "codeHighlights": [
+        { "node": "source", "line": 1, "text": "validateLogicArtifact" }
+      ]
     },
     {
       "id": "e6",

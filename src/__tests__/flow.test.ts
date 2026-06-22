@@ -133,6 +133,73 @@ describe("toReactFlowElements", () => {
     expect(gap).toBeGreaterThanOrEqual(148);
   });
 
+  test("maps edge code highlights to source and target nodes", () => {
+    const result = toReactFlowElements({
+      ...artifact,
+      nodes: [
+        {
+          id: "source",
+          kind: "call",
+          label: "call validate",
+          summary: "调用校验",
+          code: "function submit() {\n  validateForm();\n}",
+        },
+        {
+          id: "target",
+          kind: "statement",
+          label: "validateForm",
+          summary: "执行校验",
+          code: "function validateForm() {\n  return true;\n}",
+        },
+      ],
+      edges: [
+        {
+          id: "edge",
+          source: "source",
+          target: "target",
+          kind: "call",
+          codeHighlights: [
+            { node: "source", line: 2, text: "validateForm" },
+            { node: "target", line: 1, text: "validateForm" },
+          ],
+        },
+      ],
+    });
+    const source = result.nodes.find((node) => isLogicNode(node) && node.id === "source");
+    const target = result.nodes.find((node) => isLogicNode(node) && node.id === "target");
+
+    expect(source?.data.codeHighlights).toEqual([
+      {
+        line: 2,
+        text: "validateForm",
+        edgeId: "edge",
+        node: "source",
+        handleId: "code-highlight:edge:source",
+      },
+    ]);
+    expect(target?.data.codeHighlights).toEqual([
+      {
+        line: 1,
+        text: "validateForm",
+        edgeId: "edge",
+        node: "target",
+        handleId: "code-highlight:edge:target",
+      },
+    ]);
+    expect(result.edges[0].sourceHandle).toBe("code-highlight:edge:source");
+    expect(result.edges[0].targetHandle).toBe("code-highlight:edge:target");
+  });
+
+  test("uses default handles for edge ends without code highlights", () => {
+    const result = toReactFlowElements({
+      ...artifact,
+      edges: [{ id: "edge", source: "n1", target: "n2", kind: "next" }],
+    });
+
+    expect(result.edges[0].sourceHandle).toBeUndefined();
+    expect(result.edges[0].targetHandle).toBeUndefined();
+  });
+
   test("keeps module groups from overlapping", () => {
     const result = toReactFlowElements({
       ...artifact,

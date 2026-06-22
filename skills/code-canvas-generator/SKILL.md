@@ -33,7 +33,7 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 
 ## JSON 契约
 
-顶层必须是包含以下字段的对象，不要添加自定义字段：
+顶层必须是包含以下字段的对象，不要添加未说明的自定义字段：
 
 ```json
 {
@@ -96,7 +96,7 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 - `id` 在 artifact 内必须唯一，建议按阅读顺序使用 `n1`、`n2`。
 - `kind` 只能是 `entry`、`statement`、`branch`、`loop`、`call`、`return`、`throw` 之一。
 - `codeRef.file` 必须是仓库相对路径；`startLine` 和 `endLine` 必须是准确的 1-based 源码行号。
-- `code` 必须是字符串，只复制与节点直接相关的短源码片段，保持源码原样，不要改写成伪代码。
+- `code` 必须是字符串，只复制与节点直接相关的短源码片段，保持源码原样，不要改写成伪代码；推荐 40 行以内，最多不能超过 60 行。
 - 只要节点对应具体源码，就提供 `codeRef`。顶层 `entry` 始终指向用户关注流程的起点。
 
 节点类型语义：
@@ -129,6 +129,26 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 - `source` 和 `target` 必须引用 `nodes` 中已有的节点 ID。
 - `kind` 只能是 `next`、`true`、`false`、`loop`、`call`、`return`、`error` 之一。
 - 只有路径含义不能从两端节点直接看出时才添加简短 `label`。
+- 当边表示两个节点之间的关键方法、函数或命令调用关系时，优先添加 `codeHighlights`，显式标注 source 调用处和 target 声明处需要高亮的文本。
+
+可选的 `codeHighlights` 格式：
+
+```json
+{
+  "codeHighlights": [
+    { "node": "source", "line": 3, "text": "startup" },
+    { "node": "target", "line": 1, "text": "startup" }
+  ]
+}
+```
+
+高亮约束：
+
+- `node` 只能是 `source` 或 `target`。
+- `line` 是对应节点 `code` 片段内的 1-based 行号，不是源文件绝对行号。
+- `text` 必须非空，并且必须出现在该行源码中。
+- 被高亮的 source 或 target 节点必须包含 `code`。
+- 只标注源码中真实存在的调用名、声明名或关键字符，不要让 viewer 自动猜测关系。
 
 边类型语义：
 
@@ -151,5 +171,6 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 - 所有必填字符串非空，所有枚举值合法。
 - 节点 ID 唯一，边 ID 唯一，每条边都引用已有节点。
 - `codeRef` 文件存在，行号与当前源码一致，`code` 与对应源码一致。
+- 每个节点的 `code` 推荐 40 行以内，且没有任何节点超过 60 行；过长时应拆分节点或围绕关键高亮行截取更短片段。
 - 主流程从 `entry` 可达，分支、循环、调用返回和错误边的方向符合实际执行过程。
 - 未覆盖已有 artifact。

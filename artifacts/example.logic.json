@@ -258,7 +258,11 @@
       "source": "n3",
       "target": "n4",
       "kind": "call",
-      "label": "读取文件"
+      "label": "读取文件",
+      "codeHighlights": [
+        { "node": "source", "line": 3, "text": "loadArtifact" },
+        { "node": "target", "line": 1, "text": "loadArtifact" }
+      ]
     },
     {
       "id": "e7",
@@ -328,7 +332,11 @@
       "source": "n5",
       "target": "n6",
       "kind": "call",
-      "label": "安装中间件"
+      "label": "安装中间件",
+      "codeHighlights": [
+        { "node": "source", "line": 6, "text": "artifactPlugin" },
+        { "node": "target", "line": 1, "text": "artifactPlugin" }
+      ]
     },
     {
       "id": "e17",
@@ -349,7 +357,11 @@
       "source": "n8",
       "target": "n6",
       "kind": "call",
-      "label": "GET /artifact.json"
+      "label": "GET /artifact.json",
+      "codeHighlights": [
+        { "node": "source", "line": 2, "text": "/artifact.json" },
+        { "node": "target", "line": 5, "text": "/artifact.json" }
+      ]
     },
     {
       "id": "e20",
