@@ -8,6 +8,8 @@ import { createArtifactPath } from "./artifacts";
 import { OpenSourceError, openSourceNode } from "./openSource";
 import { validateLogicArtifact, type LogicArtifact } from "./shared/schema";
 
+process.title = "code-canvas";
+
 interface ViewOptions {
   host: string;
   port: number;
