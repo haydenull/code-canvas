@@ -225,10 +225,7 @@ h1 {
   overflow: auto;
   border: 1px solid #e4e7ec;
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, transparent 0 31px, rgb(17 24 39 / 4%) 31px 62px),
-    #ffffff;
-  background-size: 100% 62px;
+  background: #ffffff;
   padding: 10px;
   color: #111827;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;

@@ -14,7 +14,7 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 3. 运行 `npx @haydenull/code-canvas@latest artifact path` 获取新的 artifact 输出路径。不得自行决定默认输出目录，不得覆盖已有 artifact。
 4. 将生成结果写入上一步返回的路径。
 5. 运行 `npx @haydenull/code-canvas@latest validate <artifactPath>`。如果校验失败，根据错误信息修正文件并重新运行，直到命令成功。
-6. 回复生成文件路径和 `npx @haydenull/code-canvas@latest view <artifactPath>`。
+6. 主动运行 `npx @haydenull/code-canvas@latest view <artifactPath>` 启动 Viewer 服务，并回复生成文件路径、Viewer 地址（如已启动）和可手动执行的 view 命令；若服务启动失败，说明失败原因。
 
 如果用户给出的入口仍不明确，先阅读相关代码；只有无法可靠确定分析范围时才询问用户。
 
@@ -146,6 +146,7 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 ## 输出前检查
 
 - `npx @haydenull/code-canvas@latest validate <artifactPath>` 执行成功。
+- 已尝试启动 `npx @haydenull/code-canvas@latest view <artifactPath>`，并在回复中给出 Viewer 地址或失败原因。
 - 文件名、`artifact.id` 和回复中的路径一致。
 - 所有必填字符串非空，所有枚举值合法。
 - 节点 ID 唯一，边 ID 唯一，每条边都引用已有节点。
