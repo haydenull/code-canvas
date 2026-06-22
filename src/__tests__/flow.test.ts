@@ -29,6 +29,8 @@ const artifact: LogicArtifact = {
       kind: "branch",
       label: "isLoading?",
       summary: "判断加载状态",
+      codeRef: { file: "src/renderState.tsx", startLine: 4, endLine: 6 },
+      code: "if (isLoading) {\n  return <Loading />\n}",
     },
   ],
   edges: [{ id: "e1", source: "n1", target: "n2", kind: "next", label: "next" }],
@@ -60,12 +62,55 @@ describe("toReactFlowElements", () => {
     expect(logicNode?.position.x).toBeNumber();
   });
 
-  test("top-aligns nodes in the same horizontal lane", () => {
+  test("top-aligns nodes in the same module lane", () => {
     const result = toReactFlowElements(artifact);
     const logicNodes = result.nodes.filter(isLogicNode);
 
     expect(logicNodes[0].height).not.toBe(logicNodes[1].height);
     expect(logicNodes[0].position.y).toBe(logicNodes[1].position.y);
+  });
+
+  test("does not top-align nodes across different modules", () => {
+    const result = toReactFlowElements({
+      ...artifact,
+      nodes: [
+        {
+          id: "source",
+          kind: "entry",
+          label: "open page",
+          summary: "读取参数并加载页面状态",
+          codeRef: { file: "src/page.tsx", startLine: 1, endLine: 12 },
+          code: Array.from({ length: 12 }, (_, index) => `const value${index} = ${index}`).join("\n"),
+        },
+        {
+          id: "middle",
+          kind: "call",
+          label: "call hook",
+          summary: "调用 hook 获取状态",
+          codeRef: { file: "src/hook.tsx", startLine: 1, endLine: 4 },
+          code: "const state = useState()\nreturn state",
+        },
+        {
+          id: "target",
+          kind: "statement",
+          label: "render footer",
+          summary: "根据状态渲染底部提示",
+          codeRef: { file: "src/footer.tsx", startLine: 1, endLine: 18 },
+          code: Array.from({ length: 18 }, (_, index) => `const footer${index} = ${index}`).join("\n"),
+        },
+      ],
+      edges: [
+        { id: "source-middle", source: "source", target: "middle", kind: "next" },
+        { id: "middle-target", source: "middle", target: "target", kind: "next" },
+      ],
+    });
+    const moduleGroups = new Map(result.nodes.filter(isModuleGroupNode).map((node) => [node.data.file, node]));
+
+    for (const node of result.nodes.filter(isLogicNode)) {
+      const moduleGroup = moduleGroups.get(node.data.codeRef?.file ?? "");
+
+      expect(Number(node.position.y) - Number(moduleGroup?.position.y)).toBeGreaterThanOrEqual(56);
+    }
   });
 
   test("assigns different colors to different module groups", () => {

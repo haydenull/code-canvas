@@ -13,12 +13,22 @@ interface ViewOptions {
   port: number;
 }
 
+interface PackageJson {
+  version: string;
+}
+
 const viewerContentTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml",
 };
+
+function loadVersion(): string {
+  const packagePath = fileURLToPath(new URL("../package.json", import.meta.url));
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as PackageJson;
+  return packageJson.version;
+}
 
 function loadArtifact(path: string): LogicArtifact {
   if (!existsSync(path)) {
@@ -47,7 +57,7 @@ function parsePort(value: string): number {
 
 async function view(artifactPath: string, { host, port }: ViewOptions): Promise<void> {
   artifactPath = resolve(artifactPath);
-  const artifact = loadArtifact(artifactPath);
+  loadArtifact(artifactPath);
   const sourceRoot = process.cwd();
 
   const viewerRoot = resolve(fileURLToPath(new URL("./viewer", import.meta.url)));
@@ -82,7 +92,7 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
               return;
             }
 
-            await openSourceNode(artifact, payload.nodeId, sourceRoot);
+            await openSourceNode(loadArtifact(artifactPath), payload.nodeId, sourceRoot);
             response.setHeader("content-type", "application/json; charset=utf-8");
             response.end(JSON.stringify({ ok: true }));
           } catch (error) {
@@ -116,6 +126,17 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
     });
   });
 
+  const stop = (): void => {
+    console.log("\nStopping viewer...");
+    server.close(() => {
+      process.off("SIGINT", stop);
+      process.off("SIGTERM", stop);
+    });
+  };
+
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+
   const address = server.address();
   const listeningPort = typeof address === "object" && address ? address.port : port;
   console.log(`Local: http://${host}:${listeningPort}/`);
@@ -124,10 +145,14 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
 
 const program = new Command();
 
-program.name("code-canvas");
+program
+  .name("code-canvas")
+  .description("validate and visualize Code Canvas .logic.json artifacts")
+  .version(loadVersion(), "-v, --version", "display version number");
 
 program
   .command("validate <artifactPath>")
+  .description("validate a .logic.json artifact")
   .action(validate);
 
 program
@@ -139,6 +164,7 @@ program
 
 program
   .command("view <artifactPath>")
+  .description("serve a .logic.json artifact in the local viewer")
   .option("--host <host>", "host", "127.0.0.1")
   .option("--port <port>", "port", parsePort, 0)
   .action(view);

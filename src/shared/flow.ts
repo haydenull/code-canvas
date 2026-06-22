@@ -185,13 +185,14 @@ export function toReactFlowElements(artifact: LogicArtifact): {
   }
   dagre.layout(graph);
 
-  const laneTopByCenter = new Map<number, number>();
+  const laneTopByCenter = new Map<string, number>();
   for (const node of artifact.nodes) {
     const position = graph.node(node.id) ?? { x: 0, y: 0 };
     const height = nodeHeights.get(node.id) ?? nodeHeight;
+    const laneKey = `${node.codeRef?.file ?? ""}:${position.y}`;
     laneTopByCenter.set(
-      position.y,
-      Math.min(laneTopByCenter.get(position.y) ?? Number.POSITIVE_INFINITY, position.y - height / 2),
+      laneKey,
+      Math.min(laneTopByCenter.get(laneKey) ?? Number.POSITIVE_INFINITY, position.y - height / 2),
     );
   }
 
@@ -206,7 +207,7 @@ export function toReactFlowElements(artifact: LogicArtifact): {
       zIndex: 1,
       position: {
         x: position.x - nodeWidth / 2,
-        y: laneTopByCenter.get(position.y) ?? position.y - height / 2,
+        y: laneTopByCenter.get(`${node.codeRef?.file ?? ""}:${position.y}`) ?? position.y - height / 2,
       },
       data: {
         label: node.label,
