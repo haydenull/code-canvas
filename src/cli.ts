@@ -5,7 +5,8 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { createArtifactPath } from "./artifacts";
-import { validateLogicArtifact } from "./shared/schema";
+import { OpenSourceError, openSourceNode } from "./openSource";
+import { validateLogicArtifact, type LogicArtifact } from "./shared/schema";
 
 interface ViewOptions {
   host: string;
@@ -16,13 +17,14 @@ const viewerContentTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
 };
 
-function loadArtifact(path: string): void {
+function loadArtifact(path: string): LogicArtifact {
   if (!existsSync(path)) {
     throw new Error(`Artifact not found: ${path}`);
   }
-  validateLogicArtifact(JSON.parse(readFileSync(path, "utf8")));
+  return validateLogicArtifact(JSON.parse(readFileSync(path, "utf8")));
 }
 
 function validate(artifactPath: string): void {
@@ -45,7 +47,8 @@ function parsePort(value: string): number {
 
 async function view(artifactPath: string, { host, port }: ViewOptions): Promise<void> {
   artifactPath = resolve(artifactPath);
-  loadArtifact(artifactPath);
+  const artifact = loadArtifact(artifactPath);
+  const sourceRoot = process.cwd();
 
   const viewerRoot = resolve(fileURLToPath(new URL("./viewer", import.meta.url)));
   const server = createServer((request, response) => {
@@ -54,6 +57,40 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
     if (pathname === "/artifact.json") {
       response.setHeader("content-type", "application/json; charset=utf-8");
       response.end(readFileSync(artifactPath, "utf8"));
+      return;
+    }
+
+    if (pathname === "/open-source") {
+      if (request.method !== "POST") {
+        response.statusCode = 405;
+        response.end("Method not allowed");
+        return;
+      }
+
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk) => {
+        body += chunk;
+      });
+      request.on("end", () => {
+        void (async () => {
+          try {
+            const payload = JSON.parse(body) as { nodeId?: unknown };
+            if (typeof payload.nodeId !== "string") {
+              response.statusCode = 400;
+              response.end("nodeId must be a string");
+              return;
+            }
+
+            await openSourceNode(artifact, payload.nodeId, sourceRoot);
+            response.setHeader("content-type", "application/json; charset=utf-8");
+            response.end(JSON.stringify({ ok: true }));
+          } catch (error) {
+            response.statusCode = error instanceof OpenSourceError ? error.statusCode : 400;
+            response.end(error instanceof Error ? error.message : "Unable to open source");
+          }
+        })();
+      });
       return;
     }
 

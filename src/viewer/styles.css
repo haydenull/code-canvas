@@ -213,10 +213,49 @@ h1 {
 }
 
 .logic-node__ref {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
   color: #526174;
   font-size: 12px;
+  line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.logic-node__ref span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.logic-node__open-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  align-self: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #007acc;
+  cursor: pointer;
+  padding: 0;
+}
+
+.logic-node__open-button:hover:not(:disabled) {
+  background: #f0f8ff;
+}
+
+.logic-node__open-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.logic-node__open-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .logic-node__code {

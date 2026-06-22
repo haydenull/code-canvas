@@ -55,6 +55,8 @@ const moduleThemes: ModuleTheme[] = [
   { accent: "#ce5b7a", border: "#ce5b7a", background: "#fff0f4" },
   { accent: "#40a9a6", border: "#40a9a6", background: "#ecfbfa" },
   { accent: "#8b63cf", border: "#8b63cf", background: "#f4efff" },
+  { accent: "#d77832", border: "#d77832", background: "#fff3e8" },
+  { accent: "#65758b", border: "#65758b", background: "#f1f5f9" },
 ];
 
 function estimateTextHeight(text: string, charactersPerLine: number, lineHeight: number): number {

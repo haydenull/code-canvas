@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { StrictMode, useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Background,
@@ -16,6 +16,7 @@ import { codeToHtml, type BundledLanguage, type DecorationItem } from "shiki";
 import "@xyflow/react/dist/style.css";
 import { toReactFlowElements, type LogicCodeHighlight, type LogicFlowElementNode, type LogicFlowNode } from "../shared/flow";
 import { validateLogicArtifact, type LogicArtifact } from "../shared/schema";
+import vscodeIcon from "./assets/vscode.svg";
 import "./styles.css";
 
 function moduleThemeStyle(theme: LogicFlowNode["data"]["moduleTheme"]): CSSProperties | undefined {
@@ -164,6 +165,28 @@ function SourceCode({
 }
 
 function LogicNode({ id, data }: NodeProps<LogicFlowNode>) {
+  const [isOpening, setIsOpening] = useState(false);
+
+  async function openSource(event: MouseEvent<HTMLButtonElement>): Promise<void> {
+    event.stopPropagation();
+    setIsOpening(true);
+
+    try {
+      const response = await fetch("/open-source", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nodeId: id }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+    } catch (error) {
+      console.error("Unable to open VS Code", error);
+    } finally {
+      setIsOpening(false);
+    }
+  }
+
   return (
     <div className="logic-node" style={moduleThemeStyle(data.moduleTheme)}>
       <Handle type="target" position={Position.Left} />
@@ -173,9 +196,23 @@ function LogicNode({ id, data }: NodeProps<LogicFlowNode>) {
       {data.codeRef || data.code ? (
         <div className="logic-node__detail">
           {data.codeRef ? (
-            <p className="logic-node__ref">
-              {data.codeRef.file}:{data.codeRef.startLine}-{data.codeRef.endLine}
-            </p>
+            <>
+              <p className="logic-node__ref">
+                <span>
+                  {data.codeRef.file}:{data.codeRef.startLine}-{data.codeRef.endLine}
+                </span>
+                <button
+                  className="logic-node__open-button nodrag"
+                  type="button"
+                  title="Open in VS Code"
+                  aria-label="Open in VS Code"
+                  disabled={isOpening}
+                  onClick={openSource}
+                >
+                  <img className="logic-node__open-icon" src={vscodeIcon} alt="" />
+                </button>
+              </p>
+            </>
           ) : null}
           {data.code ? (
             <SourceCode code={data.code} file={data.codeRef?.file} nodeId={id} codeHighlights={data.codeHighlights} />
