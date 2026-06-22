@@ -11,10 +11,10 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 
 1. 定位用户指定的入口，阅读入口的完整实现，以及理解该流程必需的直接调用方、被调用函数、Hook 和共享状态。优先使用 `rg` 查找定义和引用，不要分析无关代码。
 2. 根据实际执行顺序建立节点和边。先覆盖主路径，再补充影响结果的重要分支、循环、提前返回和异常路径。
-3. 运行 `npx --yes @haydenull/code-canvas artifact path` 获取新的 artifact 输出路径。不得自行决定默认输出目录，不得覆盖已有 artifact。
+3. 运行 `npx @haydenull/code-canvas@latest artifact path` 获取新的 artifact 输出路径。不得自行决定默认输出目录，不得覆盖已有 artifact。
 4. 将生成结果写入上一步返回的路径。
-5. 运行 `npx --yes @haydenull/code-canvas validate <artifactPath>`。如果校验失败，根据错误信息修正文件并重新运行，直到命令成功。
-6. 回复生成文件路径和 `npx --yes @haydenull/code-canvas view <artifactPath>`。
+5. 运行 `npx @haydenull/code-canvas@latest validate <artifactPath>`。如果校验失败，根据错误信息修正文件并重新运行，直到命令成功。
+6. 回复生成文件路径和 `npx @haydenull/code-canvas@latest view <artifactPath>`。
 
 如果用户给出的入口仍不明确，先阅读相关代码；只有无法可靠确定分析范围时才询问用户。
 
@@ -145,7 +145,7 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 
 ## 输出前检查
 
-- `npx --yes @haydenull/code-canvas validate <artifactPath>` 执行成功。
+- `npx @haydenull/code-canvas@latest validate <artifactPath>` 执行成功。
 - 文件名、`artifact.id` 和回复中的路径一致。
 - 所有必填字符串非空，所有枚举值合法。
 - 节点 ID 唯一，边 ID 唯一，每条边都引用已有节点。
