@@ -1,64 +1,124 @@
 {
   "schemaVersion": 1,
-  "title": "提交表单流程",
+  "title": "CLI 校验 artifact 流程",
   "entry": {
-    "name": "handleSubmit",
-    "file": "src/Form.tsx",
-    "startLine": 20,
-    "endLine": 32
+    "name": "code-canvas validate",
+    "file": "src/cli.ts",
+    "startLine": 92,
+    "endLine": 94
   },
   "artifact": {
-    "id": "a1b2c3d4",
-    "createdAt": "2026-06-20T10:30:00+08:00"
+    "id": "example",
+    "createdAt": "2026-06-22T00:00:00+08:00"
   },
   "nodes": [
     {
       "id": "n1",
       "kind": "entry",
-      "label": "提交表单",
-      "summary": "handleSubmit 接收当前表单数据并开始提交。",
+      "label": "注册 validate 命令",
+      "summary": "Commander 注册 `validate <artifactPath>`，并把命令处理交给 validate 函数。",
       "codeRef": {
-        "file": "src/Form.tsx",
-        "startLine": 20,
-        "endLine": 21
+        "file": "src/cli.ts",
+        "startLine": 92,
+        "endLine": 94
       },
-      "code": "async function handleSubmit(values: FormValues) {"
+      "code": "program\n  .command(\"validate <artifactPath>\")\n  .action(validate);"
     },
     {
       "id": "n2",
-      "kind": "branch",
-      "label": "数据是否无效",
-      "summary": "校验失败时提前结束，成功时继续调用保存服务。",
+      "kind": "statement",
+      "label": "解析 artifact 路径",
+      "summary": "validate 把用户传入的 artifact 路径解析为绝对路径，然后加载该文件。",
       "codeRef": {
-        "file": "src/Form.tsx",
-        "startLine": 22,
-        "endLine": 24
+        "file": "src/cli.ts",
+        "startLine": 28,
+        "endLine": 30
       },
-      "code": "if (!validate(values)) {\n  return;\n}"
+      "code": "function validate(artifactPath: string): void {\n  artifactPath = resolve(artifactPath);\n  loadArtifact(artifactPath);"
     },
     {
       "id": "n3",
-      "kind": "return",
-      "label": "结束提交",
-      "summary": "数据无效时不发送请求。",
+      "kind": "branch",
+      "label": "artifact 文件是否存在",
+      "summary": "loadArtifact 先检查目标路径是否存在；不存在时抛出错误，存在时继续读取并校验。",
       "codeRef": {
-        "file": "src/Form.tsx",
-        "startLine": 23,
-        "endLine": 23
+        "file": "src/cli.ts",
+        "startLine": 21,
+        "endLine": 24
       },
-      "code": "return;"
+      "code": "function loadArtifact(path: string): void {\n  if (!existsSync(path)) {\n    throw new Error(`Artifact not found: ${path}`);\n  }"
     },
     {
       "id": "n4",
-      "kind": "call",
-      "label": "保存表单",
-      "summary": "调用 saveForm 持久化已通过校验的数据。",
+      "kind": "throw",
+      "label": "抛出文件不存在错误",
+      "summary": "artifact 路径不存在时抛错，CLI 顶层 catch 会输出错误并退出。",
       "codeRef": {
-        "file": "src/Form.tsx",
-        "startLine": 26,
-        "endLine": 26
+        "file": "src/cli.ts",
+        "startLine": 22,
+        "endLine": 23
       },
-      "code": "await saveForm(values);"
+      "code": "if (!existsSync(path)) {\n  throw new Error(`Artifact not found: ${path}`);"
+    },
+    {
+      "id": "n5",
+      "kind": "call",
+      "label": "读取并校验 JSON",
+      "summary": "文件存在时读取内容、解析 JSON，并调用共享 schema 校验器。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 25,
+        "endLine": 25
+      },
+      "code": "validateLogicArtifact(JSON.parse(readFileSync(path, \"utf8\")));"
+    },
+    {
+      "id": "n6",
+      "kind": "loop",
+      "label": "检查节点 ID",
+      "summary": "schema 自定义校验遍历 nodes，检查节点 ID 是否唯一，并收集 ID 供边引用检查使用。",
+      "codeRef": {
+        "file": "src/shared/schema.ts",
+        "startLine": 66,
+        "endLine": 75
+      },
+      "code": "for (const [index, node] of artifact.nodes.entries()) {\n  if (nodeIds.has(node.id)) {\n    ctx.addIssue({\n      code: \"custom\",\n      path: [\"nodes\", index, \"id\"],\n      message: `nodes[${index}].id must be unique`,\n    });\n  }\n  nodeIds.add(node.id);\n}"
+    },
+    {
+      "id": "n7",
+      "kind": "branch",
+      "label": "schema 是否通过",
+      "summary": "safeParse 失败时抛出首个校验错误；成功时返回已校验的 artifact 数据。",
+      "codeRef": {
+        "file": "src/shared/schema.ts",
+        "startLine": 112,
+        "endLine": 124
+      },
+      "code": "export function validateLogicArtifact(value: unknown): LogicArtifact {\n  const result = logicArtifactSchema.safeParse(value);\n\n  if (!result.success) {\n    const issue = result.error.issues[0];\n    if (!issue) {\n      throw new Error(\"Artifact is invalid\");\n    }\n    const path = formatPath(issue.path);\n    throw new Error(path ? `${path} ${issue.message}` : issue.message);\n  }\n\n  return result.data;\n}"
+    },
+    {
+      "id": "n8",
+      "kind": "return",
+      "label": "输出校验成功",
+      "summary": "loadArtifact 返回后，validate 打印成功信息，CLI 校验流程结束。",
+      "codeRef": {
+        "file": "src/cli.ts",
+        "startLine": 30,
+        "endLine": 31
+      },
+      "code": "loadArtifact(artifactPath);\nconsole.log(`Artifact is valid: ${artifactPath}`);"
+    },
+    {
+      "id": "n9",
+      "kind": "throw",
+      "label": "抛出校验错误",
+      "summary": "schema 校验失败时抛出带路径的错误信息，CLI 顶层 catch 会输出错误并退出。",
+      "codeRef": {
+        "file": "src/shared/schema.ts",
+        "startLine": 120,
+        "endLine": 121
+      },
+      "code": "const path = formatPath(issue.path);\nthrow new Error(path ? `${path} ${issue.message}` : issue.message);"
     }
   ],
   "edges": [
@@ -72,16 +132,60 @@
       "id": "e2",
       "source": "n2",
       "target": "n3",
-      "kind": "true",
-      "label": "校验失败"
+      "kind": "call",
+      "label": "进入 loadArtifact"
     },
     {
       "id": "e3",
-      "source": "n2",
+      "source": "n3",
       "target": "n4",
       "kind": "false",
+      "label": "文件不存在"
+    },
+    {
+      "id": "e4",
+      "source": "n3",
+      "target": "n5",
+      "kind": "true",
+      "label": "文件存在"
+    },
+    {
+      "id": "e5",
+      "source": "n5",
+      "target": "n6",
+      "kind": "call",
+      "label": "进入 schema 校验"
+    },
+    {
+      "id": "e6",
+      "source": "n6",
+      "target": "n6",
+      "kind": "loop",
+      "label": "下一个节点"
+    },
+    {
+      "id": "e7",
+      "source": "n6",
+      "target": "n7",
+      "kind": "next",
+      "label": "节点检查完成"
+    },
+    {
+      "id": "e8",
+      "source": "n7",
+      "target": "n9",
+      "kind": "false",
+      "label": "校验失败"
+    },
+    {
+      "id": "e9",
+      "source": "n7",
+      "target": "n8",
+      "kind": "return",
       "label": "校验通过"
     }
   ],
-  "notes": []
+  "notes": [
+    "这个示例只引用当前仓库中真实存在的源码文件，codeRef 行号和 code 片段应随源码变更同步更新。"
+  ]
 }

@@ -1,19 +1,20 @@
 ---
 name: code-canvas-generator
-description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所需的 `artifacts/*.logic.json` 代码逻辑图。用于分析函数、组件、Hook、事件处理器、命令入口或跨文件调用链，并输出可供 `code-canvas view` 展示的 flow artifact。
+description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所需的临时 `.logic.json` 代码逻辑图。用于分析函数、组件、Hook、事件处理器、命令入口或跨文件调用链，并输出可供 `code-canvas view` 展示的 flow artifact。
 ---
 
 # Code Canvas Generator
 
-分析用户指定的代码路径，将控制流和调用关系写入新的 `artifacts/<id>.logic.json`。本文件包含完整格式契约，不依赖目标项目中的 schema、示例或辅助脚本。
+分析用户指定的代码路径，将控制流和调用关系写入新的临时 `.logic.json` 文件。生成的 artifact 会由 Code Canvas Viewer 转换为 React Flow 图形渲染，因此必须保持节点、边和源码引用语义准确。输出路径由 Code Canvas CLI 分配，本文件包含完整格式契约，不依赖目标项目中的 schema、示例或辅助脚本。
 
 ## 执行流程
 
 1. 定位用户指定的入口，阅读入口的完整实现，以及理解该流程必需的直接调用方、被调用函数、Hook 和共享状态。优先使用 `rg` 查找定义和引用，不要分析无关代码。
 2. 根据实际执行顺序建立节点和边。先覆盖主路径，再补充影响结果的重要分支、循环、提前返回和异常路径。
-3. 创建 `artifacts/` 目录。生成不重复的 8 位小写十六进制 ID，将结果写入 `artifacts/<id>.logic.json`。如果文件已存在，重新生成 ID；不得覆盖已有 artifact。
-4. 运行 `npx --yes @haydenull/code-canvas validate artifacts/<id>.logic.json`。如果校验失败，根据错误信息修正文件并重新运行，直到命令成功。
-5. 回复生成文件路径和 `npx --yes @haydenull/code-canvas view artifacts/<id>.logic.json`。
+3. 运行 `npx --yes @haydenull/code-canvas artifact path` 获取新的 artifact 输出路径。不得自行决定默认输出目录，不得覆盖已有 artifact。
+4. 将生成结果写入上一步返回的路径。
+5. 运行 `npx --yes @haydenull/code-canvas validate <artifactPath>`。如果校验失败，根据错误信息修正文件并重新运行，直到命令成功。
+6. 回复生成文件路径和 `npx --yes @haydenull/code-canvas view <artifactPath>`。
 
 如果用户给出的入口仍不明确，先阅读相关代码；只有无法可靠确定分析范围时才询问用户。
 
@@ -140,11 +141,11 @@ description: 阅读任意项目的真实源码并生成 Code Canvas 可视化所
 
 ## 示例
 
-生成 artifact 前读取 [references/example.logic.json](references/example.logic.json)，参考其中的完整结构、节点粒度、源码引用和分支连线。该文件属于 skill 自身，发布时必须与 `SKILL.md` 一起包含。
+生成 artifact 前读取 [references/example.logic.json](references/example.logic.json)，参考其中的完整结构、节点粒度、源码引用和分支连线。
 
 ## 输出前检查
 
-- `npx --yes @haydenull/code-canvas validate artifacts/<id>.logic.json` 执行成功。
+- `npx --yes @haydenull/code-canvas validate <artifactPath>` 执行成功。
 - 文件名、`artifact.id` 和回复中的路径一致。
 - 所有必填字符串非空，所有枚举值合法。
 - 节点 ID 唯一，边 ID 唯一，每条边都引用已有节点。

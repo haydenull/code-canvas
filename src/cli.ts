@@ -1,16 +1,22 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createServer } from "node:http";
+import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import react from "@vitejs/plugin-react";
 import { Command } from "commander";
-import { createServer, type Plugin } from "vite";
+import { createArtifactPath } from "./artifacts";
 import { validateLogicArtifact } from "./shared/schema";
 
 interface ViewOptions {
   host: string;
   port: number;
 }
+
+const viewerContentTypes: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+};
 
 function loadArtifact(path: string): void {
   if (!existsSync(path)) {
@@ -25,6 +31,10 @@ function validate(artifactPath: string): void {
   console.log(`Artifact is valid: ${artifactPath}`);
 }
 
+function printArtifactPath(): void {
+  console.log(createArtifactPath().path);
+}
+
 function parsePort(value: string): number {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
@@ -33,32 +43,45 @@ function parsePort(value: string): number {
   return port;
 }
 
-function artifactPlugin(artifactPath: string): Plugin {
-  return {
-    name: "code-canvas-artifact",
-    configureServer(server) {
-      server.middlewares.use("/artifact.json", (_request, response) => {
-        response.setHeader("content-type", "application/json; charset=utf-8");
-        response.end(readFileSync(artifactPath, "utf8"));
-      });
-    },
-  };
-}
-
-async function view(artifactPath: string, { host, port }: ViewOptions) {
+async function view(artifactPath: string, { host, port }: ViewOptions): Promise<void> {
   artifactPath = resolve(artifactPath);
   loadArtifact(artifactPath);
 
-  const viewerRoot = resolve(fileURLToPath(new URL("../src/viewer", import.meta.url)));
-  const server = await createServer({
-    root: viewerRoot,
-    configFile: false,
-    server: { host, port, strictPort: port !== 0 },
-    plugins: [react(), artifactPlugin(artifactPath)],
+  const viewerRoot = resolve(fileURLToPath(new URL("./viewer", import.meta.url)));
+  const server = createServer((request, response) => {
+    const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+
+    if (pathname === "/artifact.json") {
+      response.setHeader("content-type", "application/json; charset=utf-8");
+      response.end(readFileSync(artifactPath, "utf8"));
+      return;
+    }
+
+    const relativePath = pathname === "/" ? "index.html" : pathname.slice(1);
+    const filePath = resolve(viewerRoot, relativePath);
+    const isViewerFile = pathname === "/" || pathname === "/index.html" || pathname.startsWith("/assets/");
+
+    if (!isViewerFile || !filePath.startsWith(`${viewerRoot}${sep}`) || !existsSync(filePath)) {
+      response.statusCode = 404;
+      response.end("Not found");
+      return;
+    }
+
+    response.setHeader("content-type", viewerContentTypes[extname(filePath)] ?? "application/octet-stream");
+    response.end(readFileSync(filePath));
   });
 
-  await server.listen();
-  server.printUrls();
+  await new Promise<void>((resolveListen, rejectListen) => {
+    server.once("error", rejectListen);
+    server.listen(port, host, () => {
+      server.off("error", rejectListen);
+      resolveListen();
+    });
+  });
+
+  const address = server.address();
+  const listeningPort = typeof address === "object" && address ? address.port : port;
+  console.log(`Local: http://${host}:${listeningPort}/`);
   console.log(`Serving artifact: ${artifactPath}`);
 }
 
@@ -69,6 +92,13 @@ program.name("code-canvas");
 program
   .command("validate <artifactPath>")
   .action(validate);
+
+program
+  .command("artifact")
+  .description("manage logic artifact files")
+  .command("path")
+  .description("print a new temporary .logic.json path")
+  .action(printArtifactPath);
 
 program
   .command("view <artifactPath>")
