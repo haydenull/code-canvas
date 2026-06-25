@@ -1,40 +1,42 @@
 # Code Canvas
 
-Code Canvas 将代码的控制流和调用关系转换为可交互的流程图，帮助开发者快速理解函数、组件、Hook、事件处理器和跨文件调用链。
+[简体中文](README.zh-CN.md)
 
-项目包含：
+Code Canvas converts code control flow and call relationships into interactive flowcharts, helping developers quickly understand functions, components, hooks, event handlers, and cross-file call chains.
 
-- `@haydenull/code-canvas`：校验 `.logic.json` 产物，并在 Web Viewer 中展示节点、分支、调用关系、模块分组和源码片段。
-- `code-canvas-generator` Skill：让支持 Agent Skill 的编码助手阅读真实源码，并生成可被 Code Canvas 展示的流程图产物。
+The project includes:
 
-## 效果预览
+- `@haydenull/code-canvas`: Validates `.logic.json` artifacts and displays nodes, branches, call relationships, module groups, and source code snippets in a Web Viewer.
+- `code-canvas-generator` Skill: Enables coding assistants that support Agent Skills to read real source code and generate flowchart artifacts for Code Canvas.
 
-![Code Canvas Viewer 展示 CLI 启动 view 的流程](docs/assets/code-canvas-view-flow.png)
+## Preview
 
-## 安装 CLI
+![Code Canvas Viewer showing the CLI view startup flow](docs/assets/code-canvas-view-flow.png)
 
-推荐本地全局安装 CLI：
+## Install CLI
+
+Install the CLI globally:
 
 ```bash
 npm install -g @haydenull/code-canvas@latest
 ```
 
-使用 `code-canvas view` 打开 Viewer 后，不用时记得手动关闭 view 服务。
+Use `code-canvas stop` to stop the viewer when you're done.
 
-## 安装 Skill
+## Install Skill
 
-`code-canvas-generator` Skill 位于仓库的 [`skills/code-canvas-generator`](skills/code-canvas-generator/SKILL.md) 目录。
+The `code-canvas-generator` Skill is located in the [`skills/code-canvas-generator`](skills/code-canvas-generator/SKILL.md) directory.
 
-可以使用 `npx skills` 安装：
+Install via `npx skills`:
 
 ```bash
 npx skills add haydenull/code-canvas --skill code-canvas-generator
 ```
 
-也可以使用 [haydenull/skills-manager](https://github.com/haydenull/skills-manager) 安装。
+Or install using [haydenull/skills-manager](https://github.com/haydenull/skills-manager).
 
 
-## 文档
+## Docs
 
-- [开发说明](docs/development.md)
-- [发布 npm 包](docs/publishing.md)
+- [Development Guide](docs/development.md)
+- [Publishing to npm](docs/publishing.md)

@@ -1,10 +1,12 @@
-# npm 发布流程
+# npm Publishing
 
-本文档记录 `@haydenull/code-canvas` 发布到 npm registry 的流程。
+[简体中文](publishing.zh-CN.md)
 
-## 发布前检查
+This document covers the process for publishing `@haydenull/code-canvas` to the npm registry.
 
-确认依赖安装、测试和构建通过：
+## Pre-publish Checks
+
+Confirm that dependencies are installed, tests pass, and the build succeeds:
 
 ```bash
 bun install
@@ -12,57 +14,57 @@ bun run test
 bun run build
 ```
 
-检查最终发布包内容。`npm pack` 会触发 `prepack`，因此会在打包前重新执行构建：
+Check the final package contents. `npm pack` triggers `prepack`, which re-runs the build before packaging:
 
 ```bash
 npm pack --dry-run
 ```
 
-当前发布相关配置在 `package.json` 中维护：
+Publish-related config is maintained in `package.json`:
 
-- `name` 为 `@haydenull/code-canvas`
-- `bin.code-canvas` 指向 `./dist/cli.js`
-- `files` 只发布 `dist`
-- `publishConfig.access` 为 `public`
-- `prepack` 在 `npm pack` 和 `npm publish` 前自动执行 `bun run build`
+- `name` is `@haydenull/code-canvas`
+- `bin.code-canvas` points to `./dist/cli.js`
+- `files` publishes only `dist`
+- `publishConfig.access` is `public`
+- `prepack` automatically runs `bun run build` before `npm pack` and `npm publish`
 
-## 发布
+## Publishing
 
-确认 npm 登录状态：
+Check npm login status:
 
 ```bash
 npm whoami
 ```
 
-如未登录，先登录 npm：
+If not logged in, log in first:
 
 ```bash
 npm login
 ```
 
-更新版本号。按发布内容选择 `patch`、`minor` 或 `major`：
+Bump the version. Choose `patch`, `minor`, or `major` based on the release:
 
 ```bash
 npm version patch
 ```
 
-发布到 npm：
+Publish to npm:
 
 ```bash
 npm publish
 ```
 
-`publishConfig.access` 已配置为 `public`，因此不需要在每次发布时额外传 `--access public`。
+Since `publishConfig.access` is set to `public`, there is no need to pass `--access public` on each publish.
 
-## 发布后验证
+## Post-publish Verification
 
-确认 npm 上的版本：
+Confirm the version on npm:
 
 ```bash
 npm view @haydenull/code-canvas version
 ```
 
-使用已发布的 CLI 验证：
+Verify using the published CLI:
 
 ```bash
 npx -y @haydenull/code-canvas validate artifacts/example.logic.json
