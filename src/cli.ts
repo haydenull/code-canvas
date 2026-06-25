@@ -7,6 +7,7 @@ import { Command } from "commander";
 import { createArtifactPath } from "./artifacts";
 import { OpenSourceError, openSourceNode } from "./openSource";
 import { validateLogicArtifact, type LogicArtifact } from "./shared/schema";
+import { createViewerToken, registerViewer, removeViewer, stopViewers } from "./viewerState";
 
 process.title = "code-canvas";
 
@@ -60,7 +61,10 @@ function parsePort(value: string): number {
 async function view(artifactPath: string, { host, port }: ViewOptions): Promise<void> {
   artifactPath = resolve(artifactPath);
   loadArtifact(artifactPath);
-  const sourceRoot = process.cwd();
+  const sourceRoot = resolve(process.cwd());
+  const token = createViewerToken();
+  let stopping = false;
+  let listeningPort = port;
 
   const viewerRoot = resolve(fileURLToPath(new URL("./viewer", import.meta.url)));
   const server = createServer((request, response) => {
@@ -106,6 +110,41 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
       return;
     }
 
+    if (pathname === "/__code-canvas/stop") {
+      if (request.method !== "POST") {
+        response.statusCode = 405;
+        response.end("Method not allowed");
+        return;
+      }
+
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk) => {
+        body += chunk;
+      });
+      request.on("end", () => {
+        let payload: { token?: unknown };
+        try {
+          payload = JSON.parse(body) as { token?: unknown };
+        } catch {
+          response.statusCode = 400;
+          response.end("Invalid JSON");
+          return;
+        }
+
+        if (payload.token !== token) {
+          response.statusCode = 403;
+          response.end("Invalid token");
+          return;
+        }
+
+        response.setHeader("content-type", "application/json; charset=utf-8");
+        response.end(JSON.stringify({ ok: true }));
+        queueMicrotask(stop);
+      });
+      return;
+    }
+
     const relativePath = pathname === "/" ? "index.html" : pathname.slice(1);
     const filePath = resolve(viewerRoot, relativePath);
     const isViewerFile = pathname === "/" || pathname === "/index.html" || pathname.startsWith("/assets/");
@@ -129,8 +168,14 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
   });
 
   const stop = (): void => {
+    if (stopping) {
+      return;
+    }
+
+    stopping = true;
     console.log("\nStopping viewer...");
     server.close(() => {
+      removeViewer(process.pid);
       process.off("SIGINT", stop);
       process.off("SIGTERM", stop);
     });
@@ -140,9 +185,38 @@ async function view(artifactPath: string, { host, port }: ViewOptions): Promise<
   process.once("SIGTERM", stop);
 
   const address = server.address();
-  const listeningPort = typeof address === "object" && address ? address.port : port;
+  listeningPort = typeof address === "object" && address ? address.port : port;
+  registerViewer({
+    pid: process.pid,
+    host,
+    port: listeningPort,
+    cwd: sourceRoot,
+    artifactPath,
+    startedAt: new Date().toISOString(),
+    token,
+  });
   console.log(`Local: http://${host}:${listeningPort}/`);
   console.log(`Serving artifact: ${artifactPath}`);
+}
+
+async function stopViewerCommand(): Promise<void> {
+  const result = await stopViewers();
+
+  for (const failure of result.failures) {
+    console.error(failure);
+  }
+
+  if (result.failures.length > 0) {
+    process.exitCode = 1;
+    return;
+  }
+
+  if (result.stopped === 0 && result.stale === 0) {
+    console.log("No viewer processes found.");
+    return;
+  }
+
+  console.log(`Stopped ${result.stopped} viewer process${result.stopped === 1 ? "" : "es"}.`);
 }
 
 const program = new Command();
@@ -170,6 +244,11 @@ program
   .option("--host <host>", "host", "127.0.0.1")
   .option("--port <port>", "port", parsePort, 0)
   .action(view);
+
+program
+  .command("stop")
+  .description("stop all viewer processes")
+  .action(stopViewerCommand);
 
 program.parseAsync().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
