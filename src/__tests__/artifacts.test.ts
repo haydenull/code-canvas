@@ -1,15 +1,15 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { createArtifactPath, createArtifactsDir } from "../artifacts";
 
 describe("createArtifactPath", () => {
-  test("uses a temporary directory scoped by project path", () => {
+  test("uses .code-canvas directory under home dir scoped by project path", () => {
     const dir = createArtifactsDir("/example/project");
 
-    expect(dir.startsWith(join(tmpdir(), "code-canvas"))).toBe(true);
-    expect(dir).toMatch(/[a-f0-9]{8}$/);
+    expect(dir.startsWith(join(homedir(), ".code-canvas"))).toBe(true);
+    expect(dir).toMatch(/project-[a-f0-9]{8}$/);
   });
 
   test("returns a random logic artifact path", () => {

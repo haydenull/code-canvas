@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { basename, join, resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
 export function createArtifactId(): string {
@@ -8,8 +8,10 @@ export function createArtifactId(): string {
 }
 
 export function createArtifactsDir(cwd = process.cwd()): string {
-  const projectHash = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 8);
-  return join(tmpdir(), "code-canvas", projectHash);
+  const absPath = resolve(cwd);
+  const projectHash = createHash("sha256").update(absPath).digest("hex").slice(0, 8);
+  const projectName = basename(absPath);
+  return join(homedir(), ".code-canvas", `${projectName}-${projectHash}`);
 }
 
 export function createArtifactPath(artifactsDir = createArtifactsDir()): { id: string; path: string } {
